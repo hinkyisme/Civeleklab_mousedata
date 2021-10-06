@@ -1,0 +1,174 @@
+---
+title: "Mouse Analysis Helpful Tools"
+author: "Jameson Hinkle"
+date: "8/20/20"
+output: 
+  pdf_document:
+    toc: yes
+  html_document:
+    fig_caption: yes
+    toc: yes
+---
+
+
+```{r, include =FALSE}
+library(knitr)
+opts_chunk$set(warning=FALSE, message=FALSE)
+#revealjs::html_presentation
+#fig.width
+#fig.heigth
+```
+
+
+```{r include =TRUE}
+require(tidyverse)
+require(ggpubr)
+```
+
+This document is intended to help people do basic analysis of mouse phenotyping results in various capacities.  These phenotypes include but are not limited to, Body Mass, Lean Mass, Body Fat Percent, Lean Mass Percent, Fat Mass to Lean Mass ratio, Insulin Tolerance, Glucose Tolerance, and associated AUC calculations.  
+
+## Read in data first, and appropriately orient data.
+```{r, echo = TRUE}
+
+mice <- read_csv("Cpeb4_101119_echoMRI.csv")
+
+mice <- mice %>% mutate(fat_lean_ratio = Fat_g/Lean_g)
+
+mice$Week <- as.factor(mice$Week)
+
+mice$Genotype <- factor(mice$Genotype, levels = c("WT", "Het"))
+
+
+
+```
+
+Then, if you want, you can get counts of N's from a given cohort with the following code:
+
+```{r, echo = TRUE}
+meta.test <- mice %>% filter(Week == 8)
+
+meta.test <- meta.test %>% group_by(Sex, Genotype)
+
+meta.test %>% tally()
+
+```
+
+All of the following plots can be pulled from the initially read-in data frame above.  Just choose the column you want to plot and change the axes as necessary.
+
+## Mass of mice over time
+
+```{r, echo = TRUE}
+
+Mass_g <- ggboxplot(mice, 
+                    x = "Week", y = "Mass_g", 
+                    shape = "Genotype",  
+                    title = "Mass (g) of Cpeb4 Whole-body Knockout Mice", 
+                    xlab = "Week", ylab = "Mass (g)", 
+                    add = c("mean_se", "jitter"), 
+                    add.params = list(color = "Genotype"), 
+                    facet.by = "Sex") 
+
+Mass_g <- Mass_g + stat_compare_means(aes(group = Genotype), method = "t.test", label = "p.signif")
+
+Mass_g
+
+```
+
+## Percent Lean Mass of mice over time
+
+```{r, echo = TRUE}
+
+Leanmass_perc <- ggboxplot(mice, x = "Week", y = "Leanmass_perc", 
+                           shape = "Genotype",  
+                           title = "Lean Mass Percent of Cpeb4 Whole-body Knockout Mice", 
+                           xlab = "Week", ylab = "Lean Mass Percent", add = c("mean_se", "jitter"), 
+                           add.params = list(color = "Genotype"), facet.by = "Sex") 
+
+Leanmass_perc <- Leanmass_perc + 
+  stat_compare_means(aes(group = Genotype), method = "t.test", 
+                     label = "p.signif")
+
+Leanmass_perc
+
+```
+
+## Body fat Percentage of mice over time
+
+```{r, echo = TRUE}
+
+Propmass_bodyfat <- ggboxplot(mice, x = "Week", y = "Propmass_bodyfat", 
+                              shape = "Genotype",  
+                              title = "Bodyfat Percent of Cpeb4 Whole-body Knockout Mice", 
+                              xlab = "Week", ylab = "Bodyfat Percent", add = c("mean_se", "jitter"), 
+                              add.params = list(color = "Genotype"), facet.by = "Sex") 
+
+Propmass_bodyfat <- Propmass_bodyfat + 
+  stat_compare_means(aes(group = Genotype), 
+                     method = "t.test", label = "p.signif")
+
+Propmass_bodyfat
+
+```
+
+## Fat mass:Lean Mass ratio
+
+```{r, echo = TRUE}
+
+fat_lean_ratio <- ggboxplot(mice, x = "Week", y = "fat_lean_ratio", 
+                            shape = "Genotype",  
+                            title = "Ratio of Fat to Lean Mass (g) of Cpeb4 Whole-body Knockout Mice", 
+                            xlab = "Week", ylab = "Fat:Lean (g)", 
+                            add = c("mean_se", "jitter"), 
+                            add.params = list(color = "Genotype"), facet.by = "Sex") 
+
+fat_lean_ratio <- fat_lean_ratio + 
+  stat_compare_means(aes(group = Genotype), method = "t.test", label = "p.signif")
+
+fat_lean_ratio
+
+```
+
+If you want to plot all of these plots in a grid (or a subset of them), ggpubr has a ggarrange() function that will allow you to have all these plots saved as objects, then you can save them as a grid to be viewed all at once.
+
+## Grid of plots from above
+```{r, echo = TRUE}
+
+ggarrange(Propmass_bodyfat, Leanmass_perc, Mass_g, fat_lean_ratio, common.legend = TRUE)
+
+```
+
+Next is Glucose and Insulin tolerance.  The plotting is quite similar but, the comparisons are obviously different.  Before plotting AUC, you'll either need to calculate AUC in R, or calculate it in Excel (I usually just quickly calculate AUC in Excel). After that, reading in data, and plotting is quite similar.
+
+## Insulin or Glucose tolerance of mice
+
+```{r, echo = TRUE}
+
+test <- read_csv("klf14tg_102019_GTT.csv")
+
+test$Genotype <- factor(test$Genotype, levels = c("WT", "tg"))
+
+test1 <- test %>% group_by(Week, Time, Sex, Genotype)
+
+p_line <- ggline(test, x = "Time", y = "Glucose_mgdl", 
+                 color = "Genotype", add = "mean_se", 
+                 facet.by = "Sex")
+
+p_line + 
+  stat_compare_means(aes(group = Genotype), 
+                     method = "t.test", label = "p.signif")
+
+p <- ggbarplot(test1, x = "Week", y = "AUC_linear", 
+               fill = "Genotype", 
+               title = "Mean AUC for GTT Klf14 Overexpression", 
+               xlab = "Week", ylab = "AUC", 
+               position = position_dodge(), add = "mean_se", 
+               add.params = list(color = "Genotype"), facet.by = "Sex") 
+
+p + 
+  stat_compare_means(aes(group = Genotype), method = "t.test", label = "p.signif")
+
+```
+
+
+
+
